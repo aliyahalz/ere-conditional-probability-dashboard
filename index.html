@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>ERE Conditional Probability Dashboard</title>
+<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+
+<style>
+body {
+    font-family: Arial;
+    background: #f4f6f9;
+    margin: 20px;
+}
+.container {
+    max-width: 1100px;
+    margin: auto;
+}
+.card {
+    background: white;
+    padding: 15px;
+    margin-bottom: 15px;
+    border-radius: 10px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+.controls {
+    display: flex;
+    gap: 15px;
+}
+select {
+    padding: 6px;
+}
+h2 {
+    margin-bottom: 5px;
+}
+</style>
+</head>
+
+<body>
+
+<div class="container">
+
+<div class="card">
+    <h2>🌧️ ERE Conditional Probability Dashboard</h2>
+    <p>Interactive heatmap of P(ERE | Regime, Month) + Lagged Regime Structure</p>
+</div>
+
+<div class="card">
+    <div class="controls">
+        <div>
+            Month:
+            <select id="monthSelect"></select>
+        </div>
+
+        <div>
+            Regime:
+            <select id="regimeSelect"></select>
+        </div>
+
+        <div>
+            Lag:
+            <select id="lagSelect">
+                <option value="0">Lag 0 (same day)</option>
+                <option value="1">Lag 1</option>
+                <option value="2">Lag 2</option>
+                <option value="3">Lag 3</option>
+            </select>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div id="heatmap"></div>
+</div>
+
+<div class="card">
+    <div id="lagMatrix"></div>
+</div>
+
+<div class="card">
+    <div id="summary"></div>
+</div>
+
+</div>
+
+<script>
+// -----------------------------
+// Dummy dataset (extendable)
+// -----------------------------
+const data = [
+    {month:1, regime:"R1S", ere:12, all:120},
+    {month:1, regime:"R2W", ere:8, all:100},
+    {month:1, regime:"R3NW", ere:15, all:90},
+
+    {month:2, regime:"R1S", ere:20, all:150},
+    {month:2, regime:"R2W", ere:10, all:110},
+    {month:2, regime:"R3NW", ere:25, all:130},
+
+    {month:3, regime:"R1S", ere:18, all:140},
+    {month:3, regime:"R2W", ere:14, all:120},
+    {month:3, regime:"R3NW", ere:30, all:160},
+];
+
+// -----------------------------
+// Unique axes
+// -----------------------------
+const months = [...new Set(data.map(d => d.month))];
+const regimes = [...new Set(data.map(d => d.regime))];
+
+// -----------------------------
+// Dropdown setup
+// -----------------------------
+const mSel = document.getElementById("monthSelect");
+const rSel = document.getElementById("regimeSelect");
+const lSel = document.getElementById("lagSelect");
+
+months.forEach(m=>{
+    let o=document.createElement("option");
+    o.value=m;o.text="Month "+m;
+    mSel.appendChild(o);
+});
+
+regimes.forEach(r=>{
+    let o=document.createElement("option");
+    o.value=r;o.text=r;
+    rSel.appendChild(o);
+});
+
+mSel.value=months[0];
+rSel.value=regimes[0];
+
+// -----------------------------
+// Core probability function
+// -----------------------------
+function P(month, regime){
+    let d = data.find(x=>x.month==month && x.regime==regime);
+    return d ? d.ere/d.all : 0;
+}
+
+// -----------------------------
+// HEATMAP: Month × Regime
+// -----------------------------
+function drawHeatmap(){
+    let z = [];
+    for(let r of regimes){
+        let row=[];
+        for(let m of months){
+            row.push(P(m,r));
+        }
+        z.push(row);
+    }
+
+    let trace = {
+        z: z,
+        x: months.map(m=>"M"+m),
+        y: regimes,
+        type: "heatmap",
+        colorscale: "YlOrRd"
+    };
+
+    let layout = {
+        title: "P(ERE | Regime, Month)",
+        height: 450
+    };
+
+    Plotly.newPlot("heatmap",[trace],layout);
+}
+
+// -----------------------------
+// LAG MATRIX (synthetic demo structure)
+// -----------------------------
+function drawLagMatrix(){
+    let lags = [0,1,2,3];
+
+    let z = regimes.map(r=>{
+        return lags.map(l=>{
+            // synthetic lag decay structure for demo
+            let base = P(mSel.value, r);
+            return base * Math.exp(-0.4*l);
+        });
+    });
+
+    let trace = {
+        z: z,
+        x: lags.map(l=>"Lag "+l),
+        y: regimes,
+        type: "heatmap",
+        colorscale: "Blues"
+    };
+
+    let layout = {
+        title: "Lagged Regime Conditioning (Decay Structure Demo)",
+        height: 400
+    };
+
+    Plotly.newPlot("lagMatrix",[trace],layout);
+}
+
+// -----------------------------
+// Summary panel
+// -----------------------------
+function updateSummary(){
+    let p = P(mSel.value, rSel.value);
+
+    document.getElementById("summary").innerHTML =
+    `<h3>Selected Cell</h3>
+     <b>Month:</b> ${mSel.value} <br>
+     <b>Regime:</b> ${rSel.value} <br>
+     <b>P(ERE | Regime, Month):</b> ${p.toFixed(3)}`;
+}
+
+// -----------------------------
+// Update all
+// -----------------------------
+function updateAll(){
+    drawHeatmap();
+    drawLagMatrix();
+    updateSummary();
+}
+
+// events
+mSel.onchange = updateAll;
+rSel.onchange = updateAll;
+lSel.onchange = updateAll;
+
+updateAll();
+</script>
+
+</body>
+</html>
